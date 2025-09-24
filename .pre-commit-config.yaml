@@ -1,0 +1,23 @@
+repos:
+  # --- Basic sanity checks ---
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v6.0.0
+    hooks:
+      - id: end-of-file-fixer
+      - id: trailing-whitespace
+      - id: check-merge-conflict
+      - id: check-added-large-files
+        args: ["--maxkb=500"]
+
+  # --- Ruff: formatter + linter (both modify files, and the commit fails if there were changes) ---
+  - repo: https://github.com/astral-sh/ruff-pre-commit
+    rev: v0.13.1
+    hooks:
+      # 1) Formatting (rewrites files; if something changed — the commit will fail)
+      - id: ruff-format
+        # without --check → formats; pre-commit itself will fail the commit if there are changes
+      # 2) Linter (fixes where possible; if errors remain — the commit will fail;
+      #            even if everything is fixed, the fact of changes will require you to re-run the commit)
+      - id: ruff
+        args: ["--fix", "--show-fixes"]
+        # add "--unsafe-fixes" if you are ok with aggressive auto-fixes

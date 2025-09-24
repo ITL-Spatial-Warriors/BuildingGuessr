@@ -1,0 +1,24 @@
+line-length = 110
+
+[lint]
+select = [
+    # Type annotations
+    "ANN001",  # Missing type annotation for function argument
+    "ANN201",  # Missing return type annotation for public function
+    "ANN202",  # Missing return type annotation for private function
+    "ANN204",  # Missing return type annotation for special method
+    "ANN205",  # Missing return type annotation for staticmethod
+    "ANN206",  # Missing return type annotation for classmethod
+
+    # Docstrings
+    "D100",  # Missing docstring in public module
+    "D101",  # Missing docstring in public class
+    "D102",  # Missing docstring in public method
+    "D103",  # Missing docstring in public function
+    "D104",  # Missing docstring in public package
+    "D106",  # Missing docstring in public nested class
+    "D107",  # Missing docstring in __init__
+]
+
+[lint.pydocstyle]
+convention = "google"  # Use Google style for docstrings
