@@ -1,5 +1,7 @@
 # ML System Design — MVP
 
+> ⚠️ WORK IN PROGRESS
+
 > **Scope (MVP):** сервис определяет координаты зданий по фотографиям для Москвы/МО. Целевая точность MVP: средняя ошибка ≤ **50 м**. Фокус — скорость разработки + база для масштабирования.
 
 ---
@@ -32,17 +34,27 @@
   * Коллекция `Places`: `place_id (PK)`, `vec`, `lat`, `lon`, `yaw?`, `image_uri`, `city`, `ts`, `extras(json)`.
   * Коллекция `Buildings`: `building_id (PK)`, `place_id`, `bbox`, `vec`, `lat`, `lon`, `address?`, `extras(json)`.
 
-## 5) System Architecture (TBD)
+## 5) System Architecture
 
 * **Сервисы:**
 
-  1. **API & Ingestion (FastAPI)** — приём запросов, загрузка в MinIO, создание `job_id`.
-  2. **Orchestrator / Ranking** — очередь задач (Redis), вызовы ML‑сервисов, поиск в Milvus, слияние результатов, запись метаданных.
-  3. **Building Detection** — `POST /infer` → bbox\[] + conf.
-  4. **Place Recognition** — `POST /embed` (целое фото) → вектор.
-  5. **Building Recognition** — `POST /embed` (кроп здания) → вектор.
-* **Зависимости:** **Redis** (очередь/кэш), **Milvus**, **MinIO**.
-* **Доступ к Milvus:** на MVP — **общая Python‑библиотека** (CRUD+search). (В перспективе — отдельный Vector Index Service.)
+  1. **API & Ingestion (FastAPI)** — приём запросов (file/URL), загрузка в **MinIO**, создание `job_id`, публикация задачи в очередь (**Redis**).
+  2. **Orchestrator / Ranking (worker)** — тянет задачи из очереди; делает **препроцессинг** (декод, resize/normalize, кропы по bbox), вызывает **Triton** (HTTP/gRPC) для `detection`, `place_embed`, `building_embed`; выполняет **поиск/апсерты в Milvus**, **слияние/ранжирование** результатов и формирование ответа/метаданных.
+  3. **Triton Inference Server** — единый сервер инференса моделей:
+
+     * `model_repository`: модели `detection`, `place_embed`, `building_embed`;
+     * порты: **HTTP :8000**, **gRPC :8001**, **Prometheus :8002**.
+
+* **Зависимости:** **Redis** (очередь/кэш), **Milvus** (векторные коллекции и скалярные поля), **MinIO** (S3‑совместимое хранилище). *(Опционально: Prometheus/Grafana для метрик Triton.)*
+
+* **Доступ к Milvus:** на MVP — общая Python‑библиотека `libs/vecdb` (CRUD + search). В перспективе — выделенный **Vector Index Service**.
+
+* **Внутренние общие библиотеки:** `libs/triton_client` (тонкий клиент Triton), `libs/image_ops` (декод/resize/кропы), `libs/ranking` (фьюжн/эвристики), `libs/storage` (MinIO), `libs/contracts` (схемы Pydantic), `libs/settings` (конфиги).
+
+* **Границы ответственности:**
+
+  * **Triton** — только инференс моделей (без бизнес‑логики и доступа к БД/хранилищам).
+  * **Orchestrator** — препроцессинг/постпроцессинг, работа с БД/хранилищами, бизнес‑правила, ретраи/таймауты/идемпотентность.
 
 ## 6) Inference Path (E2E)
 
