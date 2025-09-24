@@ -1,0 +1,16 @@
+[project]
+name = "triton-client"
+version = "0.1.0"
+description = "Thin Triton client library"
+readme = "README.md"
+authors = [
+    { name = "Alexander Melekhin", email = "amelekhin96@gmail.com" },
+    { name = "Georgii Kartashov" },
+    { name = "Timophey Kondrashov" },
+]
+requires-python = ">=3.12"
+dependencies = []
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"

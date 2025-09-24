@@ -1,0 +1,11 @@
+[project]
+name = "building-guessr"
+version = "0.1.0"
+requires-python = ">=3.12"
+
+[tool.uv.workspace]
+members = ["services/*", "libs/*"]
+exclude = ["services/triton"]
+
+[tool.uv.sources]
+triton_client = { workspace = true }
