@@ -1,0 +1,14 @@
+services:
+  api:
+    build:
+      context: .
+      dockerfile: services/api/Dockerfile
+    image: building-guessr-api:latest
+    container_name: building_guessr_api
+    ports:
+      - "8000:8000"
+    environment:
+      # Example placeholders for future configuration
+      - UVICORN_WORKERS=1
+      - LOG_LEVEL=info
+    restart: unless-stopped
