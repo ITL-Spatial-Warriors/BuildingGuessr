@@ -1,0 +1,31 @@
+---
+description:
+globs:
+alwaysApply: true
+---
+
+# General Context
+
+- Purpose: MVP service that predicts a place/building’s coordinates from a photo.
+- Repo: Backend monorepo.
+- Architecture: Microservices.
+- Gateway: API + Orchestrator combined in one service; all front-end interaction goes through it.
+- Inference: Use NVIDIA Triton for model inference.
+- Vector Search: Use Milvus.
+- API Framework (Python): FastAPI.
+
+# General Rules
+
+- Manage Python dependencies and run scripts with `uv` (`uv venv`, `uv add`, `uv run`).
+- Use Ruff as the sole Python linter/formatter (`ruff check --fix`, `ruff format`).
+- Configure everything in `pyproject.toml` (uv + Ruff); avoid per-tool config files.
+- Keep secrets in environment variables; never commit them.
+
+# Python Rules
+
+- Produce clear, idiomatic Python.
+- Prefer simple solutions over complex ones.
+- Use modern Python 3.10+ typing everywhere (functions, variables, return types), e.g., `dict[str, int | float] | None`.
+- Write Google-style docstrings for all public functions/classes (include Args, Returns, Raises, Examples when useful).
+- Favor standard library over third-party packages unless asked otherwise.
+- Include a brief usage example or doctest when it improves clarity.
