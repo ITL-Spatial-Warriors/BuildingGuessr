@@ -4,6 +4,7 @@ Exposes health and synchronous `/locate` endpoints.
 """
 
 from fastapi import FastAPI, Response, UploadFile, File, Form, HTTPException
+from fastapi.middleware.cors import CORSMiddleware
 import time
 import uuid
 
@@ -20,6 +21,14 @@ from api.storage_s3 import upload_bytes
 from api.image_ops import read_and_validate, to_jpeg_bytes, image_to_numpy
 
 app = FastAPI(title="BuildingGuessr API", version=__version__)
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["http://localhost:3000", "http://127.0.0.1:3000"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
 process_start_time = time.monotonic()
 
