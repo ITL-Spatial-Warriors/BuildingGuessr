@@ -4,7 +4,7 @@ from torch import Tensor
 
 
 def input_transform(image_size: tuple[float, float] = (322, 322)):
-        """Pipeline for image transforming for preprocessing, image size is need to 
+        """Pipeline for image transforming for preprocessing, image sides sizes is needed to be divisable by 14
         Returns function that can transform input images 
         """
         return T.Compose([
