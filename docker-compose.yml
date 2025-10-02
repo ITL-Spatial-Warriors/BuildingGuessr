@@ -1,0 +1,30 @@
+services:
+  api:
+    build:
+      context: .
+      dockerfile: services/api/Dockerfile
+    image: building-guessr-api:latest
+    container_name: building_guessr_api
+    ports:
+      - "8000:8000"
+    environment:
+      # App config (required / recommended)
+      - S3_BUCKET=${S3_BUCKET:?S3 bucket required}
+      - S3_REGION=${S3_REGION:-}
+      - S3_PREFIX=${S3_PREFIX:-places/}
+      - S3_ENDPOINT_URL=${S3_ENDPOINT_URL:-}
+      - S3_SSE=${S3_SSE:-}
+      - S3_SSE_KMS_KEY_ID=${S3_SSE_KMS_KEY_ID:-}
+      - MAX_UPLOAD_MB=${MAX_UPLOAD_MB:-5}
+      - JPEG_QUALITY=${JPEG_QUALITY:-90}
+
+      # AWS credentials/region (boto3 will pick these up if provided)
+      - AWS_ACCESS_KEY_ID=${AWS_ACCESS_KEY_ID:-}
+      - AWS_SECRET_ACCESS_KEY=${AWS_SECRET_ACCESS_KEY:-}
+      - AWS_REGION=${AWS_REGION:-}
+      - AWS_DEFAULT_REGION=${AWS_DEFAULT_REGION:-}
+
+      # Runtime
+      - UVICORN_WORKERS=${UVICORN_WORKERS:-1}
+      - LOG_LEVEL=${LOG_LEVEL:-info}
+    restart: unless-stopped
