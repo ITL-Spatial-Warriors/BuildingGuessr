@@ -15,7 +15,7 @@ from starlette.status import (
 )
 
 from api import __version__
-from api.schemas import LocateRequest, LocateResponse
+from api.schemas import LocateRequest, LocateResponse, LocateResult, Evidence, BBoxOnQuery
 from api.settings import get_settings
 from api.storage_s3 import upload_bytes
 from api.image_ops import read_and_validate, to_jpeg_bytes, image_to_numpy
@@ -114,5 +114,59 @@ async def locate(
     # Prepare decoded data for downstream steps (not yet used)
     _ = image_to_numpy(pil_img)
 
-    # Stub response for MVP
-    return LocateResponse(results=[])
+    # Build a meaningful stub response with a public link to a known object
+    best_meme_key = "best_meme.jpeg"
+    if settings.s3_endpoint_url:
+        gallery_url = f"{settings.s3_endpoint_url.rstrip('/')}/{settings.s3_bucket}/{best_meme_key}"
+    elif settings.s3_region:
+        gallery_url = f"https://{settings.s3_bucket}.s3.{settings.s3_region}.amazonaws.com/{best_meme_key}"
+    else:
+        gallery_url = f"https://{settings.s3_bucket}.s3.amazonaws.com/{best_meme_key}"
+
+    candidate_id = uuid.uuid4()
+    return LocateResponse(
+        results=[
+            LocateResult(
+                place_id=candidate_id,
+                lat=55.7517,
+                lon=37.6175,
+                address="Stub: Red Square, Moscow",
+                score=0.95,
+                source="place",
+                evidence=Evidence(
+                    distance=0.12,
+                    gallery_image_uri=gallery_url,
+                    query_image_uri=uri,
+                    bboxes_on_query=[BBoxOnQuery(bbox=(0.0, 0.0, 1.0, 1.0), conf=0.99)],
+                ),
+            ),
+            LocateResult(
+                place_id=candidate_id,
+                lat=55.7517,
+                lon=37.6175,
+                address="Stub: Red Square, Moscow",
+                score=0.95,
+                source="place",
+                evidence=Evidence(
+                    distance=0.12,
+                    gallery_image_uri=gallery_url,
+                    query_image_uri=uri,
+                    bboxes_on_query=[BBoxOnQuery(bbox=(0.0, 0.0, 1.0, 1.0), conf=0.99)],
+                ),
+            ),
+            LocateResult(
+                place_id=candidate_id,
+                lat=55.7517,
+                lon=37.6175,
+                address="Stub: Red Square, Moscow",
+                score=0.95,
+                source="place",
+                evidence=Evidence(
+                    distance=0.12,
+                    gallery_image_uri=gallery_url,
+                    query_image_uri=uri,
+                    bboxes_on_query=[BBoxOnQuery(bbox=(0.0, 0.0, 1.0, 1.0), conf=0.99)],
+                ),
+            ),
+        ]
+    )
