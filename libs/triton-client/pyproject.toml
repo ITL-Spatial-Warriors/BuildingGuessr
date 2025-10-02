@@ -9,7 +9,10 @@ authors = [
     { name = "Timophey Kondrashov" },
 ]
 requires-python = ">=3.12"
-dependencies = []
+dependencies = [
+    "numpy>=2.3.3",
+    "tritonclient[http]>=2.60.0",
+]
 
 [build-system]
 requires = ["hatchling"]

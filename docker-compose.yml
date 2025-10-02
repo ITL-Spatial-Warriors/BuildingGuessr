@@ -27,4 +27,28 @@ services:
       # Runtime
       - UVICORN_WORKERS=${UVICORN_WORKERS:-1}
       - LOG_LEVEL=${LOG_LEVEL:-info}
+      # Milvus Lite database file (used by in-process Milvus Lite)
+      - MILVUS_LITE_PATH=${MILVUS_LITE_PATH:-/data/milvus-lite.db}
     restart: unless-stopped
+    volumes:
+      - milvus_lite_data:/data
+
+  triton:
+    image: nvcr.io/nvidia/tritonserver:25.08-py3
+    container_name: building_guessr_triton
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - capabilities: [gpu]
+    command: ["tritonserver", "--model-repository=/models"]
+    volumes:
+      - /home/melekhin_aa/Work/BuildingGuessr/services/triton/models:/models
+    ports:
+      - "8003:8000"  # HTTP
+      - "8001:8001"  # gRPC
+      - "8002:8002"  # Metrics
+    restart: unless-stopped
+
+volumes:
+  milvus_lite_data:
