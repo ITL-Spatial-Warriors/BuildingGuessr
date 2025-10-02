@@ -8,6 +8,8 @@ from fastapi.middleware.cors import CORSMiddleware
 import time
 import uuid
 
+import numpy as np
+
 from starlette.status import (
     HTTP_400_BAD_REQUEST,
     HTTP_413_REQUEST_ENTITY_TOO_LARGE,
@@ -31,6 +33,164 @@ app.add_middleware(
 )
 
 process_start_time = time.monotonic()
+
+
+def fake_pr_response(vector_size: int = 256) -> np.ndarray:
+    """Generate a fake place-recognition embedding array.
+
+    Simulates a Triton model output by returning a NumPy array of shape
+    (1, `vector_size`) with dtype float32, filled with random values in the
+    half-open interval [0.0, 1.0).
+
+    Args:
+        vector_size: Length of the embedding vector to generate.
+
+    Returns:
+        numpy.ndarray: Array with shape (1, vector_size) and dtype float32.
+
+    Examples:
+        >>> vec = fake_pr_response(4)
+        >>> vec.shape
+        (1, 4)
+    """
+    return np.random.rand(1, vector_size).astype(np.float32)
+
+
+def fake_request_to_milvus(embedding: np.ndarray, top_k: int) -> LocateResult:
+    """Simulate a Milvus vector search and return a single top result.
+
+    Accepts an embedding of shape (1, D) and a requested `top_k` and
+    returns a stubbed `LocateResult` representing the best match.
+
+    Args:
+        embedding: Query embedding array with shape (1, D).
+        top_k: Number of requested nearest neighbors (unused beyond scoring stub).
+
+    Returns:
+        LocateResult: Single candidate with stubbed fields and evidence.
+    """
+    _ = embedding  # placeholder to acknowledge input
+    k = max(int(top_k), 1)
+
+    settings = get_settings()
+
+    # Build a gallery URL similar to the one used in the /locate stub
+    best_meme_key = "best_meme.jpeg"
+    if settings.s3_endpoint_url:
+        gallery_url = f"{settings.s3_endpoint_url.rstrip('/')}/{settings.s3_bucket}/{best_meme_key}"
+    elif settings.s3_region:
+        gallery_url = f"https://{settings.s3_bucket}.s3.{settings.s3_region}.amazonaws.com/{best_meme_key}"
+    else:
+        gallery_url = f"https://{settings.s3_bucket}.s3.amazonaws.com/{best_meme_key}"
+
+    # Score/distance stubs influenced by top_k for deterministic-ish variation
+    score = float(np.clip(1.0 - 0.05 * (k - 1), 0.0, 1.0))
+    distance = float(np.clip(0.2 * k, 0.0, 10.0))
+
+    candidate_id = uuid.uuid4()
+    return LocateResult(
+        place_id=candidate_id,
+        lat=55.7517,
+        lon=37.6175,
+        address="Stub: Red Square, Moscow",
+        score=score,
+        source="place",
+        evidence=Evidence(
+            distance=distance,
+            gallery_image_uri=gallery_url,
+            query_image_uri="s3://stub/query.jpg",
+            bboxes_on_query=[BBoxOnQuery(bbox=(0.0, 0.0, 1.0, 1.0), conf=0.99)],
+        ),
+    )
+
+
+def fake_detect_buildings(img: np.ndarray, max_detections: int = 2) -> list[BBoxOnQuery]:
+    """Generate fake building detections as bounding boxes on the query image.
+
+    Produces up to `max_detections` boxes in absolute pixel coordinates with
+    confidence values in [0.0, 1.0].
+
+    Args:
+        img: Query image as NumPy array with shape (H, W, C).
+        max_detections: Maximum number of boxes to return.
+
+    Returns:
+        List of `BBoxOnQuery` instances.
+    """
+    height, width = int(img.shape[0]), int(img.shape[1])
+    rng = np.random.default_rng()
+    num = int(max_detections)
+    results: list[BBoxOnQuery] = []
+    for _ in range(num):
+        x1 = float(rng.integers(0, max(1, width // 2)))
+        y1 = float(rng.integers(0, max(1, height // 2)))
+        x2 = float(rng.integers(int(x1) + 1, width))
+        y2 = float(rng.integers(int(y1) + 1, height))
+        conf = float(rng.uniform(0.7, 0.99))
+        results.append(BBoxOnQuery(bbox=(x1, y1, x2, y2), conf=conf))
+    return results
+
+
+def fake_search_places_in_milvus(
+    *,
+    embedding: np.ndarray,
+    top_k: int,
+    query_image_uri: str,
+    bboxes_on_query: list[BBoxOnQuery],
+) -> list[LocateResult]:
+    """Return `top_k` fake nearest neighbors for the given embedding.
+
+    Args:
+        embedding: Query embedding of shape (1, D).
+        top_k: Number of neighbors to return.
+        query_image_uri: URI of the uploaded query image for evidence.
+        bboxes_on_query: Detector bboxes overlay for the query image.
+
+    Returns:
+        List of `LocateResult` sorted by descending score.
+    """
+    _ = embedding
+    k = max(int(top_k), 1)
+    settings = get_settings()
+
+    best_meme_key = "best_meme.jpeg"
+    if settings.s3_endpoint_url:
+        gallery_url = f"{settings.s3_endpoint_url.rstrip('/')}/{settings.s3_bucket}/{best_meme_key}"
+    elif settings.s3_region:
+        gallery_url = f"https://{settings.s3_bucket}.s3.{settings.s3_region}.amazonaws.com/{best_meme_key}"
+    else:
+        gallery_url = f"https://{settings.s3_bucket}.s3.amazonaws.com/{best_meme_key}"
+
+    base_score = 0.95
+    score_decay = 0.05
+    base_distance = 0.12
+    distance_step = 0.08
+
+    results: list[LocateResult] = []
+    for i in range(k):
+        score = float(np.clip(base_score - score_decay * i, 0.0, 1.0))
+        distance = float(max(0.0, base_distance + distance_step * i))
+        candidate_id = uuid.uuid4()
+        lat = 55.7517 + 0.001 * i
+        lon = 37.6175 + 0.001 * i
+        address = f"Stub: Candidate #{i + 1}, Moscow"
+        results.append(
+            LocateResult(
+                place_id=candidate_id,
+                lat=lat,
+                lon=lon,
+                address=address,
+                score=score,
+                source="place",
+                evidence=Evidence(
+                    distance=distance,
+                    gallery_image_uri=gallery_url,
+                    query_image_uri=query_image_uri,
+                    bboxes_on_query=bboxes_on_query,
+                ),
+            )
+        )
+    return results
 
 
 @app.get("/health", include_in_schema=False)
@@ -111,62 +271,21 @@ async def locate(
     except Exception as exc:  # pragma: no cover
         raise HTTPException(status_code=502, detail="s3_upload_failed") from exc
 
-    # Prepare decoded data for downstream steps (not yet used)
-    _ = image_to_numpy(pil_img)
+    # Prepare decoded data for downstream steps
+    np_img = image_to_numpy(pil_img)
 
-    # Build a meaningful stub response with a public link to a known object
-    best_meme_key = "best_meme.jpeg"
-    if settings.s3_endpoint_url:
-        gallery_url = f"{settings.s3_endpoint_url.rstrip('/')}/{settings.s3_bucket}/{best_meme_key}"
-    elif settings.s3_region:
-        gallery_url = f"https://{settings.s3_bucket}.s3.{settings.s3_region}.amazonaws.com/{best_meme_key}"
-    else:
-        gallery_url = f"https://{settings.s3_bucket}.s3.amazonaws.com/{best_meme_key}"
+    # 3) Fake building detection (returns absolute pixel bboxes)
+    bboxes_on_query = fake_detect_buildings(np_img, max_detections=2)
 
-    candidate_id = uuid.uuid4()
-    return LocateResponse(
-        results=[
-            LocateResult(
-                place_id=candidate_id,
-                lat=55.7517,
-                lon=37.6175,
-                address="Stub: Red Square, Moscow",
-                score=0.95,
-                source="place",
-                evidence=Evidence(
-                    distance=0.12,
-                    gallery_image_uri=gallery_url,
-                    query_image_uri=uri,
-                    bboxes_on_query=[BBoxOnQuery(bbox=(0.0, 0.0, 1.0, 1.0), conf=0.99)],
-                ),
-            ),
-            LocateResult(
-                place_id=candidate_id,
-                lat=55.7517,
-                lon=37.6175,
-                address="Stub: Red Square, Moscow",
-                score=0.95,
-                source="place",
-                evidence=Evidence(
-                    distance=0.12,
-                    gallery_image_uri=gallery_url,
-                    query_image_uri=uri,
-                    bboxes_on_query=[BBoxOnQuery(bbox=(0.0, 0.0, 1.0, 1.0), conf=0.99)],
-                ),
-            ),
-            LocateResult(
-                place_id=candidate_id,
-                lat=55.7517,
-                lon=37.6175,
-                address="Stub: Red Square, Moscow",
-                score=0.95,
-                source="place",
-                evidence=Evidence(
-                    distance=0.12,
-                    gallery_image_uri=gallery_url,
-                    query_image_uri=uri,
-                    bboxes_on_query=[BBoxOnQuery(bbox=(0.0, 0.0, 1.0, 1.0), conf=0.99)],
-                ),
-            ),
-        ]
+    # 4) Fake place recognition embedding via Triton stub
+    embedding = fake_pr_response(vector_size=256)
+
+    # 5) Fake Milvus search for top-k
+    results = fake_search_places_in_milvus(
+        embedding=embedding,
+        top_k=topk,
+        query_image_uri=str(uri),
+        bboxes_on_query=bboxes_on_query,
     )
+
+    return LocateResponse(results=results)
