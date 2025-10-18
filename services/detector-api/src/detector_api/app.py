@@ -73,7 +73,7 @@ def detect(image: UploadFile = File(...)) -> dict[str, Any]:
         tmp.write(image.file.read())
         tmp_path = tmp.name
 
-    conf = float(os.getenv("DETECT_CONF", "0.25"))
+    conf = float(os.getenv("DETECT_CONF", "0.01"))
 
     try:
         results = app.state.model.predict(tmp_path, conf=conf, verbose=False)
