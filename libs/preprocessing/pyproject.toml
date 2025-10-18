@@ -9,8 +9,8 @@ authors = [
 requires-python = ">=3.12"
 dependencies = [
     "pillow>=11.3.0",
-    "torch>=2.8.0",
-    "torchvision>=0.23.0",
+    "torch>=2.5.1",
+    "torchvision>=0.20.1",
 ]
 
 [build-system]
