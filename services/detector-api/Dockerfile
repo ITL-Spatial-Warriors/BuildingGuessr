@@ -1,0 +1,1 @@
+FROM nvcr.io/nvidia/cuda:12.1.1-cudnn8-devel-ubuntu22.04
