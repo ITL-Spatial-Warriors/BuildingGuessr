@@ -7,10 +7,15 @@ authors = [
     { name = "Alexander Melekhin", email = "amelekhin96@gmail.com" }
 ]
 requires-python = ">=3.12"
-dependencies = []
+dependencies = [
+    "fastapi",
+    "uvicorn[standard]",
+    "pillow",
+    "torch",
+]
 
 [project.scripts]
-pr-api = "pr_api:main"
+pr-api = "pr_api.app:main"
 
 [build-system]
 requires = ["hatchling"]
