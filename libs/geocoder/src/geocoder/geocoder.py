@@ -43,7 +43,6 @@ class Geocoder:
         for p in points_to_search:
             try:
                 adress = self.g.reverse(p, language='ru')
-                adress_str = adress.address
                 if 'house_number' in adress.raw["address"].keys():
                     houses_found.append(adress)
             except:                                                                                       
