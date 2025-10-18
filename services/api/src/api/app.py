@@ -7,6 +7,8 @@ from fastapi import FastAPI, Response, UploadFile, File, Form, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 import time
 import uuid
+import json
+from io import BytesIO
 
 import numpy as np
 
@@ -208,6 +210,7 @@ def health(response: Response) -> dict[str, str | float]:
 async def locate(
     file: UploadFile = File(..., description="Query image file (e.g., JPEG/PNG)"),
     topk: int = Form(3, description="Number of top results to return (>=1)"),
+    meta: UploadFile | None = File(None, description="Meta file (e.g., JSON)"),
 ) -> LocateResponse:
     """Accept an image and return top-k candidate places.
 
@@ -270,6 +273,54 @@ async def locate(
         )
     except Exception as exc:  # pragma: no cover
         raise HTTPException(status_code=502, detail="s3_upload_failed") from exc
+
+    # If optional meta JSON file is provided: upload next to image and parse fields
+    meta_lat: float | None = None
+    meta_lon: float | None = None
+    meta_angle: float | None = None
+    if meta is not None:
+        try:
+            meta_bytes = await meta.read()
+        except Exception:
+            meta_bytes = b""
+
+        # Save meta JSON side-by-side with same basename
+        try:
+            meta_key = f"{settings.s3_prefix}{place_id}.json"
+            if meta_bytes:
+                upload_bytes(
+                    content=BytesIO(meta_bytes),
+                    bucket=settings.s3_bucket,
+                    key=meta_key,
+                    content_type="application/json",
+                )
+        except Exception:
+            # Meta is optional; ignore upload failures
+            pass
+
+        # Safely parse latitude/longitude/angle
+        if meta_bytes:
+            try:
+                payload = json.loads(meta_bytes.decode("utf-8", errors="replace"))
+                if isinstance(payload, dict):
+
+                    def _to_float(value: object) -> float | None:
+                        try:
+                            if value is None:
+                                return None
+                            return float(value)
+                        except (TypeError, ValueError):
+                            return None
+
+                    meta_lat = _to_float(payload.get("latitude"))
+                    meta_lon = _to_float(payload.get("longitude"))
+                    meta_angle = _to_float(payload.get("angle"))
+            except Exception:
+                # Ignore malformed JSON
+                pass
+
+    if meta is not None:
+        print(f"Parsed meta: latitude={meta_lat}, longitude={meta_lon}, angle={meta_angle}")
 
     # Prepare decoded data for downstream steps
     np_img = image_to_numpy(pil_img)
