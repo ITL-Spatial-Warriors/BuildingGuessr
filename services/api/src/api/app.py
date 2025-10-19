@@ -428,6 +428,53 @@ async def locate(
     # Prepare decoded data for downstream steps
     np_img = image_to_numpy(pil_img)
 
+    fake_results = [
+        LocateResult(
+            place_id=0,
+            lat=55.9517,
+            lon=37.5175,
+            address="Pervomayskaya 3, Dolgoprudny",
+            score=0.95,
+            source="place",
+            evidence=Evidence(
+                distance=0.12,
+                gallery_image_uri="https://storage.yandexcloud.net/building-guessr-data/match1.png",
+                query_image_uri="https://storage.yandexcloud.net/building-guessr-data/query.png",
+                bboxes_on_query=[[0, 0, 100, 100]],
+            ),
+        ),
+        LocateResult(
+            place_id=1,
+            lat=55.9517,
+            lon=37.5175,
+            address="Pervomayskaya 3, Dolgoprudny",
+            score=0.95,
+            source="place",
+            evidence=Evidence(
+                distance=0.12,
+                gallery_image_uri="https://storage.yandexcloud.net/building-guessr-data/match2.png",
+                query_image_uri="https://storage.yandexcloud.net/building-guessr-data/query.png",
+                bboxes_on_query=[[0, 0, 100, 100]],
+            ),
+        ),
+        LocateResult(
+            place_id=2,
+            lat=55.9517,
+            lon=37.5175,
+            address="Pervomayskaya 3, Dolgoprudny",
+            score=0.95,
+            source="place",
+            evidence=Evidence(
+                distance=0.12,
+                gallery_image_uri="https://storage.yandexcloud.net/building-guessr-data/match3.png",
+                query_image_uri="https://storage.yandexcloud.net/building-guessr-data/query.png",
+                bboxes_on_query=[[0, 0, 100, 100]],
+            ),
+        ),
+    ]
+
+    return LocateResponse(results=fake_results)
+
     # 3) Fake building detection (returns absolute pixel bboxes)
     bboxes_on_query = fake_detect_buildings(np_img, max_detections=2)
 
@@ -482,50 +529,4 @@ async def locate(
             )
         )
 
-    # 55.933302, 37.514230 coords
-    fake_results = [
-        LocateResult(
-            place_id=0,
-            lat=55.9517,
-            lon=37.5175,
-            address="Первомайская улица, 3, Долгопрудный, Московская область",
-            score=0.95,
-            source="place",
-            evidence=Evidence(
-                distance=0.12,
-                gallery_image_uri="https://storage.yandexcloud.net/building-guessr-data/match1.png",
-                query_image_uri="https://storage.yandexcloud.net/building-guessr-data/query.png",
-                bboxes_on_query=[[0, 0, 100, 100]],
-            ),
-        ),
-        LocateResult(
-            place_id=1,
-            lat=55.9517,
-            lon=37.5175,
-            address="Первомайская улица, 3, Долгопрудный, Московская область",
-            score=0.95,
-            source="place",
-            evidence=Evidence(
-                distance=0.12,
-                gallery_image_uri="https://storage.yandexcloud.net/building-guessr-data/match2.png",
-                query_image_uri="https://storage.yandexcloud.net/building-guessr-data/query.png",
-                bboxes_on_query=[[0, 0, 100, 100]],
-            ),
-        ),
-        LocateResult(
-            place_id=2,
-            lat=55.9517,
-            lon=37.5175,
-            address="Первомайская улица, 3, Долгопрудный, Московская область",
-            score=0.95,
-            source="place",
-            evidence=Evidence(
-                distance=0.12,
-                gallery_image_uri="https://storage.yandexcloud.net/building-guessr-data/match3.png",
-                query_image_uri="https://storage.yandexcloud.net/building-guessr-data/query.png",
-                bboxes_on_query=[[0, 0, 100, 100]],
-            ),
-        ),
-    ]
-
-    return LocateResponse(results=fake_results)
+    return LocateResponse(results=results)
