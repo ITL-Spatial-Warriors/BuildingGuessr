@@ -23,6 +23,12 @@ class Settings:
         s3_sse_kms_key_id: KMS key id/arn when using SSE-KMS.
         max_upload_mb: Maximum upload size in megabytes.
         jpeg_quality: JPEG quality for normalized images (1-100).
+        pr_api_url: Base URL of the Place Recognition service (e.g., http://pr-api:8080).
+        pr_api_timeout_s: Timeout in seconds for PR API requests.
+        pr_input_size: Target square size (pixels) for PR model input (e.g., 224).
+        milvus_db_path: Local path to Milvus Lite DB file (e.g., ./moscow2019_MegaLoc.db).
+        milvus_collection: Collection name for places (e.g., "places").
+        milvus_vector_field: Name of the vector field (e.g., "vec").
     """
 
     s3_bucket: str
@@ -33,6 +39,12 @@ class Settings:
     s3_sse_kms_key_id: str | None
     max_upload_mb: int
     jpeg_quality: int
+    pr_api_url: str
+    pr_api_timeout_s: float
+    pr_input_size: int
+    milvus_db_path: str
+    milvus_collection: str
+    milvus_vector_field: str
 
 
 def _get_env_int(name: str, default: int) -> int:
@@ -69,4 +81,10 @@ def get_settings() -> Settings:
         s3_sse_kms_key_id=os.environ.get("S3_SSE_KMS_KEY_ID"),
         max_upload_mb=_get_env_int("MAX_UPLOAD_MB", 5),
         jpeg_quality=_get_env_int("JPEG_QUALITY", 90),
+        pr_api_url=os.environ.get("PR_API_URL", "http://pr-api:8080"),
+        pr_api_timeout_s=float(os.environ.get("PR_API_TIMEOUT_S", "5")),
+        pr_input_size=_get_env_int("PR_INPUT_SIZE", 224),
+        milvus_db_path=os.environ.get("MILVUS_DB_PATH", "./moscow2019_MegaLoc.db"),
+        milvus_collection=os.environ.get("MILVUS_COLLECTION", "places"),
+        milvus_vector_field=os.environ.get("MILVUS_VECTOR_FIELD", "vec"),
     )

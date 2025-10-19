@@ -22,7 +22,9 @@ from api import __version__
 from api.schemas import LocateRequest, LocateResponse, LocateResult, Evidence, BBoxOnQuery
 from api.settings import get_settings
 from api.storage_s3 import upload_bytes
-from api.image_ops import read_and_validate, to_jpeg_bytes, image_to_numpy
+from api.image_ops import read_and_validate, to_jpeg_bytes, image_to_numpy, preprocess_for_pr
+import httpx
+from api.vector_db import search_places
 
 app = FastAPI(title="BuildingGuessr API", version=__version__)
 
@@ -56,6 +58,80 @@ def fake_pr_response(vector_size: int = 256) -> np.ndarray:
         (1, 4)
     """
     return np.random.rand(1, vector_size).astype(np.float32)
+
+
+async def pr_embed_request(
+    *,
+    client: httpx.AsyncClient,
+    base_url: str,
+    tensor: np.ndarray,
+    shape: list[int],
+    timeout_s: float,
+) -> np.ndarray:
+    """Call PR service `/embed` with Triton-like JSON and return (1, D) array.
+
+    Args:
+        client: Shared async HTTP client.
+        base_url: PR service base URL, e.g., "http://pr-api:8080".
+        tensor: Input tensor [1,3,H,W] float32 in [0,1].
+        shape: Declared shape list matching tensor shape.
+        timeout_s: Request timeout seconds.
+
+    Returns:
+        np.ndarray: Array of shape (1, D), dtype=float32.
+    """
+
+    payload = {
+        "inputs": [
+            {
+                "name": "IMAGE",
+                "datatype": "FP32",
+                "shape": shape,
+                "data": tensor.tolist(),
+            }
+        ],
+        "parameters": {},
+    }
+
+    url = base_url.rstrip("/") + "/embed"
+    try:
+        resp = await client.post(url, json=payload, timeout=timeout_s)
+    except httpx.ConnectTimeout as exc:
+        raise HTTPException(status_code=502, detail="pr_upstream_timeout") from exc
+    except httpx.ReadTimeout as exc:
+        raise HTTPException(status_code=502, detail="pr_upstream_timeout") from exc
+    except httpx.HTTPError as exc:
+        raise HTTPException(status_code=502, detail="pr_upstream_error") from exc
+
+    if resp.status_code == 503:
+        raise HTTPException(status_code=503, detail="pr_unavailable")
+    if resp.status_code >= 400:
+        raise HTTPException(status_code=502, detail="pr_upstream_bad_status")
+
+    try:
+        body = resp.json()
+    except Exception as exc:
+        raise HTTPException(status_code=502, detail="pr_invalid_json") from exc
+
+    outputs = body.get("outputs")
+    if not isinstance(outputs, list) or not outputs:
+        raise HTTPException(status_code=502, detail="pr_missing_outputs")
+    vector_out = None
+    for out in outputs:
+        if isinstance(out, dict) and out.get("name") == "VECTOR":
+            vector_out = out
+            break
+    if vector_out is None:
+        raise HTTPException(status_code=502, detail="pr_vector_not_found")
+
+    data = vector_out.get("data")
+    if not isinstance(data, list):
+        raise HTTPException(status_code=502, detail="pr_invalid_vector_data")
+
+    vec = np.asarray(data, dtype=np.float32)
+    if vec.ndim != 1 or vec.size == 0:
+        raise HTTPException(status_code=502, detail="pr_invalid_vector_shape")
+    return vec.reshape(1, -1)
 
 
 def fake_request_to_milvus(embedding: np.ndarray, top_k: int) -> LocateResult:
@@ -355,15 +431,55 @@ async def locate(
     # 3) Fake building detection (returns absolute pixel bboxes)
     bboxes_on_query = fake_detect_buildings(np_img, max_detections=2)
 
-    # 4) Fake place recognition embedding via Triton stub
-    embedding = fake_pr_response(vector_size=256)
+    # 4) Place recognition embedding via PR API
+    # Preprocess into [1,3,224,224] float32 [0,1]
+    x, shape = preprocess_for_pr(pil_img, target_size=get_settings().pr_input_size)
+    settings = get_settings()
+    async with httpx.AsyncClient() as client:
+        embedding = await pr_embed_request(
+            client=client,
+            base_url=settings.pr_api_url,
+            tensor=x,
+            shape=shape,
+            timeout_s=settings.pr_api_timeout_s,
+        )
 
-    # 5) Fake Milvus search for top-k
-    results = fake_search_places_in_milvus(
-        embedding=embedding,
+    # 5) Milvus Lite search for top-k
+    hits = search_places(
+        db_path=settings.milvus_db_path,
+        collection=settings.milvus_collection,
+        vector_field=settings.milvus_vector_field,
+        query_vec=embedding,
         top_k=topk,
-        query_image_uri=str(uri),
-        bboxes_on_query=bboxes_on_query,
+        output_fields=("place_id", "lat", "lon", "address", "image_uri"),
     )
+
+    results: list[LocateResult] = []
+    for hit in hits:
+        ent = hit.get("entity", {})
+        distance = float(hit.get("distance", 0.0))
+        # Convert cosine distance to similarity-like score in [0,1]
+        score = float(max(0.0, min(1.0, 1.0 - distance)))
+        place_id_val = ent.get("place_id")
+        lat_val = ent.get("lat", 0.0)
+        lon_val = ent.get("lon", 0.0)
+        addr_val = ent.get("address") or ""
+        gallery_uri = ent.get("image_uri") or ""
+        results.append(
+            LocateResult(
+                place_id=place_id_val,
+                lat=float(lat_val),
+                lon=float(lon_val),
+                address=str(addr_val),
+                score=score,
+                source="place",
+                evidence=Evidence(
+                    distance=distance,
+                    gallery_image_uri=str(gallery_uri),
+                    query_image_uri=str(uri),
+                    bboxes_on_query=bboxes_on_query,
+                ),
+            )
+        )
 
     return LocateResponse(results=results)
