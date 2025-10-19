@@ -12,6 +12,7 @@ dependencies = [
     "uvicorn[standard]",
     "pillow",
     "torch",
+    "torchvision",
 ]
 
 [project.scripts]
