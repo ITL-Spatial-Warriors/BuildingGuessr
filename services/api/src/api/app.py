@@ -433,7 +433,7 @@ async def locate(
 
     fake_results = [
         LocateResult(
-            place_id=0,
+            place_id=uuid.uuid4(),
             lat=55.9517,
             lon=37.5175,
             address="Pervomayskaya 3, Dolgoprudny",
@@ -447,7 +447,7 @@ async def locate(
             ),
         ),
         LocateResult(
-            place_id=1,
+            place_id=uuid.uuid4(),
             lat=55.9517,
             lon=37.5175,
             address="Pervomayskaya 3, Dolgoprudny",
@@ -461,7 +461,7 @@ async def locate(
             ),
         ),
         LocateResult(
-            place_id=2,
+            place_id=uuid.uuid4(),
             lat=55.9517,
             lon=37.5175,
             address="Pervomayskaya 3, Dolgoprudny",
