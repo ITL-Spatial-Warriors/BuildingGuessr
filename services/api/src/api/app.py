@@ -24,6 +24,7 @@ from api.settings import get_settings
 from api.storage_s3 import upload_bytes
 from api.image_ops import read_and_validate, to_jpeg_bytes, image_to_numpy, preprocess_for_pr
 import httpx
+from api.vector_db import search_places
 
 app = FastAPI(title="BuildingGuessr API", version=__version__)
 
@@ -443,12 +444,42 @@ async def locate(
             timeout_s=settings.pr_api_timeout_s,
         )
 
-    # 5) Fake Milvus search for top-k
-    results = fake_search_places_in_milvus(
-        embedding=embedding,
+    # 5) Milvus Lite search for top-k
+    hits = search_places(
+        db_path=settings.milvus_db_path,
+        collection=settings.milvus_collection,
+        vector_field=settings.milvus_vector_field,
+        query_vec=embedding,
         top_k=topk,
-        query_image_uri=str(uri),
-        bboxes_on_query=bboxes_on_query,
+        output_fields=("place_id", "lat", "lon", "address", "image_uri"),
     )
+
+    results: list[LocateResult] = []
+    for hit in hits:
+        ent = hit.get("entity", {})
+        distance = float(hit.get("distance", 0.0))
+        # Convert cosine distance to similarity-like score in [0,1]
+        score = float(max(0.0, min(1.0, 1.0 - distance)))
+        place_id_val = ent.get("place_id")
+        lat_val = ent.get("lat", 0.0)
+        lon_val = ent.get("lon", 0.0)
+        addr_val = ent.get("address") or ""
+        gallery_uri = ent.get("image_uri") or ""
+        results.append(
+            LocateResult(
+                place_id=place_id_val,
+                lat=float(lat_val),
+                lon=float(lon_val),
+                address=str(addr_val),
+                score=score,
+                source="place",
+                evidence=Evidence(
+                    distance=distance,
+                    gallery_image_uri=str(gallery_uri),
+                    query_image_uri=str(uri),
+                    bboxes_on_query=bboxes_on_query,
+                ),
+            )
+        )
 
     return LocateResponse(results=results)
