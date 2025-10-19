@@ -278,6 +278,7 @@ async def locate(
     meta_lat: float | None = None
     meta_lon: float | None = None
     meta_angle: float | None = None
+    meta_issues_bboxes: list[list[int]] = []
     if meta is not None:
         try:
             meta_bytes = await meta.read()
@@ -315,12 +316,38 @@ async def locate(
                     meta_lat = _to_float(payload.get("latitude"))
                     meta_lon = _to_float(payload.get("longitude"))
                     meta_angle = _to_float(payload.get("angle"))
+
+                    issues = payload.get("issues")
+                    if isinstance(issues, list):
+
+                        def _to_int(value: object) -> int | None:
+                            try:
+                                if value is None:
+                                    return None
+                                return int(value)
+                            except (TypeError, ValueError):
+                                return None
+
+                        for issue in issues:
+                            if not isinstance(issue, dict):
+                                continue
+                            bbox = issue.get("bbox")
+                            if not isinstance(bbox, dict):
+                                continue
+                            x = _to_int(bbox.get("x"))
+                            y = _to_int(bbox.get("y"))
+                            w = _to_int(bbox.get("w"))
+                            h = _to_int(bbox.get("h"))
+                            if None not in (x, y, w, h):
+                                meta_issues_bboxes.append([int(x), int(y), int(w), int(h)])
             except Exception:
                 # Ignore malformed JSON
                 pass
 
     if meta is not None:
         print(f"Parsed meta: latitude={meta_lat}, longitude={meta_lon}, angle={meta_angle}")
+        if meta_issues_bboxes:
+            print(f"Parsed issues bboxes: {meta_issues_bboxes}")
 
     # Prepare decoded data for downstream steps
     np_img = image_to_numpy(pil_img)
