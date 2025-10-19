@@ -72,3 +72,39 @@ def image_to_numpy(img: Image.Image) -> np.ndarray:
     """Convert PIL image to NumPy array (H, W, C), dtype=uint8."""
 
     return np.asarray(img)
+
+
+def preprocess_for_pr(img: Image.Image, target_size: int = 224) -> tuple[np.ndarray, list[int]]:
+    """Preprocess image into PR model input tensor.
+
+    Converts a PIL RGB image to a float32 tensor with values in [0, 1], shape
+    [1, 3, target_size, target_size] (NCHW), suitable for Triton-like JSON.
+
+    Args:
+        img: PIL image in RGB mode.
+        target_size: Target square size (pixels), e.g., 224.
+
+    Returns:
+        Tuple of (tensor, shape), where tensor is np.ndarray dtype=float32 with
+        shape [1, 3, target_size, target_size], and shape is the same as a list
+        for inclusion in JSON payloads.
+    """
+
+    if img.mode != "RGB":
+        img = img.convert("RGB")
+
+    # Resize to target_size x target_size using bilinear resampling
+    resized = img.resize((int(target_size), int(target_size)), Image.BILINEAR)
+
+    # To numpy HWC uint8, then normalize to [0,1] float32
+    hwc = np.asarray(resized, dtype=np.uint8)
+    x = hwc.astype(np.float32) / 255.0
+
+    # HWC -> CHW
+    chw = np.transpose(x, (2, 0, 1))
+
+    # Add batch dimension: NCHW
+    nchw = np.expand_dims(chw, axis=0)
+
+    shape = [1, 3, int(target_size), int(target_size)]
+    return nchw, shape
